@@ -2,6 +2,7 @@ import sqlite3
 import streamlit as st
 from pathlib import Path
 
+
 _DB_PATH = str(Path(__file__).parent.parent.parent / "data.db")
 
 
@@ -11,7 +12,12 @@ def _get_connection():
         _DB_PATH,
         check_same_thread=False
     )
+
     conn.row_factory = sqlite3.Row
+
+    # Enable foreign key enforcement
+    conn.execute("PRAGMA foreign_keys = ON")
+
     return conn
 
 
@@ -39,33 +45,82 @@ def init_db():
             )
         """)
 
+
 def get_user(username):
-    conn=_get_connection()
+    conn = _get_connection()
 
     return conn.execute("""
-    SELECT * FROM users WHERE username =?
-    """,(username)).fetchone()
+        SELECT * 
+        FROM users 
+        WHERE username = ?
+    """, (username,)).fetchone()
+
 
 def create_user(username):
-    conn=_get_connection()
+    conn = _get_connection()
 
     with conn:
         conn.execute("""
-        INSERT INTO users (username VALUES (?)
-        """,(username))
+            INSERT INTO users (username)
+            VALUES (?)
+        """, (username,))
 
     return get_user(username)
 
+
 def get_or_create_user(username):
-    user=get_user(username)
+    user = get_user(username)
 
     if user is None:
-        user=create_user(username)
+        user = create_user(username)
 
     return user
 
-def add_exercise(user_id,exercise_name,reps,sets,time):
-    conn=_get_connection()
+
+def add_exercise(user_id, exercise_name, reps, sets, time):
+    conn = _get_connection()
 
     with conn:
-        
+        existing = conn.execute("""
+            SELECT *
+            FROM exercises
+            WHERE user_id = ?
+              AND exercise_name = ?
+              AND DATE(created_at) = DATE('now')
+        """, (user_id, exercise_name)).fetchone()
+
+        if existing:
+            conn.execute("""
+                UPDATE exercises
+                SET reps = reps + ?,
+                    sets = sets + ?,
+                    time = time + ?
+                WHERE id = ?
+            """, (reps, sets, time, existing["id"]))
+
+        else:
+            conn.execute("""
+                INSERT INTO exercises (
+                    user_id,
+                    exercise_name,
+                    sets,
+                    reps,
+                    time
+                )
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                exercise_name,
+                sets,
+                reps,
+                time
+            ))
+
+
+def get_users_exercises(user_id):
+    conn=_get_connection()
+
+    conn.execute("""
+    SELECT * FROM exercises
+    WHERE user_id=?
+    """,(user_id)).fetchone()
