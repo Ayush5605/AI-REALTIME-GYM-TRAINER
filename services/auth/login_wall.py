@@ -17,7 +17,7 @@ def render_login_wall():
             st.error("Name cannot be empty.")
             return False
 
-        user=get_or_create_user
+        user=get_or_create_user(username)
 
         st.session_state["username"]=user["username"]
         st.session_state["user_id"]=user["id"]
