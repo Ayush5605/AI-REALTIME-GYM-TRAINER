@@ -23,6 +23,8 @@ class BaseExercise(ABC):
 
          cos_angle=min(1.0,dot/(mag_a*mag_c))
 
+         return math.degree(math.acos(cos_angle))
+
          
         
 
