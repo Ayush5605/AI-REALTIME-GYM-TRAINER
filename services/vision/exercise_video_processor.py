@@ -1,7 +1,10 @@
 from streamlit_webrtc import VideoProcessorBase
 import threading
 import cv2
+import av
 import os
+import numpy as np
+import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from detectors.Biceps_curl import BicepsCurlDetector
@@ -183,5 +186,43 @@ class VideoProcessorClass(VideoProcessorBase):
             (0, 255, 0),
             2,
         )
+
+    def revc(self,frame):
+        image=np.asarray(
+            cv2.flip(frame.to_ndarray(format="bgr24"),1),
+            dtype=np.uint8
+            
+        )
+
+        mp_image=mp.Image(
+            image_format=mp.ImageFormat.SRGB,
+            data=cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
+
+        )
+        self._frame_timestamps_ms+=30
+
+        result=self._landmarker.detect_for_video(mp_image,self._frame_timestamps_ms)
+
+        if result.pose_landmarks:
+            landmarks=result.pose_landmarks[0]
+            self._draw_sekeleton(image,landmarks)
+
+            ex_type=self.get_exercise()
+
+            detector=self._detectors.fet(ex_type)
+
+            if detector:
+                metrics=detector.process(landmarks)
+
+                self._draw_overlays(image,metrics,ex_type)
+
+                self.set_latest_metrics(metrics)
+
+
+        else:
+            self._draw_no_pose_warnings(image)
+
+        return av.VideoFrame.from_ndarray(image,format="bgr24")
+
 
 
