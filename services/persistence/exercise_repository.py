@@ -118,9 +118,9 @@ def add_exercise(user_id, exercise_name, reps, sets, time):
 
 
 def get_users_exercises(user_id):
-    conn=_get_connection()
+    conn = _get_connection()
 
-    conn.execute("""
-    SELECT * FROM exercises
-    WHERE user_id=?
-    """,(user_id)).fetchone()
+    return conn.execute("""
+        SELECT * FROM exercises
+        WHERE user_id = ?
+    """, (user_id,)).fetchall()
