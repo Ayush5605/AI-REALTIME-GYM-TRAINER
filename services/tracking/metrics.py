@@ -21,12 +21,30 @@ def sync_metrics_update(context):
         return
 
 
-    reps=latest_metrics.get("reps")
-    st.session_state.reps=reps
+    # Each detector supplies a cumulative live rep count. Derive the set
+    # progress from that count instead of leaving the sidebar values at their
+    # session defaults.
+    reps = max(0, int(latest_metrics.get("reps", 0) or 0))
+    reps_per_set = max(0, int(st.session_state.get("reps_per_set", 0) or 0))
+    target_sets = max(0, int(st.session_state.get("target_sets", 0) or 0))
 
-    # `METRICS_FIELDS` is keyed by the selected exercise name, not by the
-    # literal string "exercise".  Using the literal meant this was always
-    # `None`, so the function returned before copying any live metrics.
+    st.session_state.reps = reps
+
+    if reps_per_set:
+        st.session_state.current_set_reps = reps % reps_per_set
+        st.session_state.sets_completed = min(
+            reps // reps_per_set,
+            target_sets,
+        )
+        st.session_state.workout_complete = (
+            target_sets > 0
+            and reps >= reps_per_set * target_sets
+        )
+    else:
+        st.session_state.current_set_reps = 0
+        st.session_state.sets_completed = 0
+        st.session_state.workout_complete = False
+
     fields = METRICS_FIELDS.get(exercise)
 
     if not fields:

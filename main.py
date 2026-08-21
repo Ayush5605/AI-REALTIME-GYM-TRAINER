@@ -120,6 +120,9 @@ def main():
 
                 # Reset workout counters
                 st.session_state.reps = 0
+                st.session_state.current_set_reps = 0
+                st.session_state.sets_completed = 0
+                st.session_state.workout_complete = False
                 st.session_state.set_cycle_started_at=time.time()
                 st.session_state.last_saved_sets_completed= 0
                 st.session_state.last_notified_sets_completed = 0
@@ -130,21 +133,15 @@ def main():
 
         else:
 
-            # Keep the running workout independent from the editable plan
-            # widget. `exercise_type` is captured when Start Workout is
-            # pressed and is also used by the video processor.
+         
+          
             exercise = st.session_state.get(
                 "exercise_type",
                 st.session_state.get("plan_exercise")
             )
 
-            sets = st.session_state.get(
-                "plan_sets"
-            )
-
-            reps = st.session_state.get(
-                "plan_reps"
-            )
+            sets = st.session_state.get("target_sets", 0)
+            reps = st.session_state.get("reps_per_set", 0)
 
             st.info(
                 f"**{exercise}** — "
@@ -187,15 +184,8 @@ def main():
                 0
             )
 
-            reps_per_set = st.session_state.get(
-                "plan_reps",
-                0
-            )
-
-            target_sets = st.session_state.get(
-                "plan_sets",
-                0
-            )
+            reps_per_set = st.session_state.get("reps_per_set", 0)
+            target_sets = st.session_state.get("target_sets", 0)
 
             st.subheader("Progress")
 
@@ -406,6 +396,12 @@ def main():
 
             async_processing=True
         )
+       
+        if context.video_processor:
+            context.video_processor.set_exercise(
+                st.session_state.get("exercise_type", "Squats")
+            )
+
         sync_metrics_update(context)
 
         if context.state.playing:
@@ -415,32 +411,6 @@ def main():
         inject_webrtc_styles()
 
        
-        if context.video_processor:
-
-            selected_exercise = st.session_state.get(
-                "exercise_type",
-                exercise
-            )
-
-            context.video_processor.set_exercise(
-                selected_exercise
-            )
-
-          
-
-            metrics = (
-                context.video_processor
-                .get_latest_metrics()
-            )
-
-            if metrics:
-
-                # Store metrics in Streamlit session state
-                for key, value in metrics.items():
-
-                    st.session_state[key] = value
-
-
         st.markdown("### Workout History")
 
 
