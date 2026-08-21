@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import textwrap
 import time
+import pandas as pd
 
 from streamlit_webrtc import ( webrtc_streamer,WebRtcMode)
 
@@ -9,9 +10,43 @@ from services.auth.login_wall import render_login_wall
 from services.state.session_default import initial_session_defaults
 from services.config.workout_config import EXERCISE_OPTIONS
 from services.ui.style_loader import (load_css,inject_local_font,inject_webrtc_styles)
-from services.persistence.exercise_repository import init_db
+from services.persistence.exercise_repository import (
+    add_exercise,
+    get_users_exercises,
+    init_db,
+)
 from services.vision.exercise_video_processor import VideoProcessorClass
 from services.tracking.metrics import sync_metrics_update
+
+
+def render_workout_history():
+    """Show the signed-in user's saved workout totals."""
+    user_id = st.session_state.get("user_id")
+    if user_id is None:
+        return
+
+    records = get_users_exercises(user_id)
+    st.subheader("Workout History")
+
+    if not records:
+        st.caption("No completed workouts yet.")
+        return
+
+    history = pd.DataFrame(
+        [
+            {
+                "Exercise": record["exercise_name"],
+                "Sets": record["sets"],
+                "Reps": record["reps"],
+                "Duration (sec)": record["time"],
+                "Date": record["created_at"],
+            }
+            for record in records
+        ]
+    )
+    st.dataframe(history, hide_index=True, width="stretch")
+
+
 def main():
 
 
@@ -155,6 +190,18 @@ def main():
             )
 
             if end_session_button:
+
+                started_at = st.session_state.get(
+                    "set_cycle_started_at",
+                    time.time(),
+                )
+                add_exercise(
+                    user_id=st.session_state["user_id"],
+                    exercise_name=exercise,
+                    reps=int(st.session_state.get("reps", 0)),
+                    sets=int(st.session_state.get("sets_completed", 0)),
+                    time=max(0, int(time.time() - started_at)),
+                )
 
                 st.session_state.workout_started= False
 
@@ -409,11 +456,8 @@ def main():
             st.rerun()
 
         inject_webrtc_styles()
-
-       
-        st.markdown("### Workout History")
-
-
+    st.divider()
+    render_workout_history()
 
 
 if __name__ == "__main__":
