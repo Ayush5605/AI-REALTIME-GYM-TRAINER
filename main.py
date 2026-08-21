@@ -11,6 +11,7 @@ from services.config.workout_config import EXERCISE_OPTIONS
 from services.ui.style_loader import (load_css,inject_local_font,inject_webrtc_styles)
 from services.persistence.exercise_repository import init_db
 from services.vision.exercise_video_processor import VideoProcessorClass
+from services.tracking.metrics import sync_metrics_update
 def main():
 
 
@@ -129,8 +130,12 @@ def main():
 
         else:
 
+            # Keep the running workout independent from the editable plan
+            # widget. `exercise_type` is captured when Start Workout is
+            # pressed and is also used by the video processor.
             exercise = st.session_state.get(
-                "plan_exercise"
+                "exercise_type",
+                st.session_state.get("plan_exercise")
             )
 
             sets = st.session_state.get(
@@ -216,7 +221,8 @@ def main():
             st.divider()
 
             exercise = st.session_state.get(
-                "plan_exercise"
+                "exercise_type",
+                st.session_state.get("plan_exercise")
             )
 
             if exercise == "Squats":
@@ -400,6 +406,11 @@ def main():
 
             async_processing=True
         )
+        sync_metrics_update(context)
+
+        if context.state.playing:
+            time.sleep(0.25)
+            st.rerun()
 
         inject_webrtc_styles()
 
@@ -407,8 +418,8 @@ def main():
         if context.video_processor:
 
             selected_exercise = st.session_state.get(
-                "plan_exercise",
-                "Squats"
+                "exercise_type",
+                exercise
             )
 
             context.video_processor.set_exercise(
