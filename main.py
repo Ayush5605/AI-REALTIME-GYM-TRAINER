@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import textwrap
+import time
 
 from streamlit_webrtc import ( webrtc_streamer,WebRtcMode)
 
@@ -78,13 +79,13 @@ def main():
 
         if not workout_started:
 
-            st.selectbox(
+            plan_exercise=st.selectbox(
                 "Exercise",
                 options=EXERCISE_OPTIONS,
                 key="plan_exercise"
             )
 
-            st.number_input(
+            plan_sets=st.number_input(
                 "Sets",
                 min_value=0,
                 max_value=50,
@@ -92,7 +93,7 @@ def main():
                 step=1
             )
 
-            st.number_input(
+            plan_reps=st.number_input(
                 "Reps",
                 min_value=0,
                 max_value=50,
@@ -109,15 +110,19 @@ def main():
             )
 
             if start_session_button:
+                st.session_state.exercise_type=plan_exercise
+                st.session_state.target_sets=int(plan_sets)
+                st.session_state.reps_per_set=int(plan_reps)
+                
 
-                st.session_state[
-                    "workout_started"
-                ] = True
+                st.session_state.workout_started = True
 
                 # Reset workout counters
-                st.session_state["reps"] = 0
-                st.session_state["current_set_reps"] = 0
-                st.session_state["sets_completed"] = 0
+                st.session_state.reps = 0
+                st.session_state.set_cycle_started_at=time.time()
+                st.session_state.last_saved_sets_completed= 0
+                st.session_state.last_notified_sets_completed = 0
+                st.session_state.last_notified_workout_complete=False
 
                 st.rerun()
 
@@ -149,9 +154,7 @@ def main():
 
             if end_session_button:
 
-                st.session_state[
-                    "workout_started"
-                ] = False
+                st.session_state.workout_started= False
 
                 st.rerun()
 
@@ -162,6 +165,7 @@ def main():
         if workout_started:
 
             st.divider()
+            exercise=st.session_state.get("exercise_type")
 
             total_reps = st.session_state.get(
                 "reps",
