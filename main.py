@@ -557,11 +557,8 @@ def main():
             context.video_processor.set_exercise(
                 st.session_state.get("exercise_type", "Squats")
             )
-
-        sync_metrics_update(context)
-
-        if context.state.playing:
-            time.sleep(0.25)
+            sync_metrics_update(context)
+            time.sleep(0.5)
             st.rerun()
 
         inject_webrtc_styles()
