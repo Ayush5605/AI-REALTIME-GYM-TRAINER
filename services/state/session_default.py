@@ -12,6 +12,7 @@ def initial_session_defaults():
         "last_notified_sets_completed": 0,
         "last_notified_workout_complete": False,
         "last_saved_sets_completed": 0,
+        "last_mid_set_feedback_marker": None,
         "set_cycle_started_at": 0.0,
         "last_exercise_type": "Squats",
         

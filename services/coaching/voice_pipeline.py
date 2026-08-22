@@ -3,12 +3,16 @@ import streamlit as st
 
 
 class VoicePipeline:
-    def __init__(self,llm,tts):
-        self.llm=llm
-        self.tts=tts
-        self.last_spoken_at=0
+    FORM_CORRECTION_COOLDOWN_SECONDS = 6
+    MID_SET_FEEDBACK_INTERVAL_SECONDS = 12
 
-    def _find_form_issue(self,exercise,metrics):
+    def __init__(self, llm, tts):
+        self.llm = llm
+        self.tts = tts
+        self.last_spoken_at = 0
+        self.last_error = None
+
+    def _find_form_issue(self, exercise, metrics):
 
         if "issue" in metrics:
             return metrics["issue"]
@@ -16,7 +20,7 @@ class VoicePipeline:
         if exercise == "Squats":
             depth = metrics.get("depth_status", "")
             back_angle = metrics.get("back_angle", 180)
-            
+
             if depth == "TOO HIGH":
                 return "The user's squat is not deep enough — knees are not bending sufficiently."
 
@@ -26,7 +30,7 @@ class VoicePipeline:
         elif exercise == "Push-ups":
             alignment = metrics.get("body_alignment", "")
             hip_status = metrics.get("hip_status", "")
-            
+
             if alignment == "Poor Form":
                 return "The user's body is not straight during the push-up."
 
@@ -39,7 +43,7 @@ class VoicePipeline:
         elif exercise == "Biceps Curls (Dumbbell)":
             swing = metrics.get("swing_status", "")
             shoulder = metrics.get("shoulder_status", "")
-            
+
             if swing == "SWINGING":
                 return "The user is swinging their torso during the curl — keep the body still."
 
@@ -48,8 +52,7 @@ class VoicePipeline:
 
         elif exercise == "Shoulder Press":
             back_arch = metrics.get("back_arch_status", "")
-            extension = metrics.get("extension_status", "")
-            
+
             if back_arch == "Excessive Arch":
                 return "The user is arching their lower back excessively during the press."
 
@@ -58,45 +61,90 @@ class VoicePipeline:
 
         elif exercise == "Lunges":
             balance = metrics.get("balance_status", "")
-            
+
             if balance == "OFF BALANCE":
                 return "The user is losing balance during the lunge — feet should be hip-width apart."
 
         return None
 
-        
-        
+    def process_event(self, event, exercise, metrics):
 
+        issue = self._find_form_issue(exercise, metrics)
 
+        now = time.time()
 
-    def process_event(self,event,exercise,metrics):
-        issue=self._find_form_issue(exercise,metrics)
+        is_priority_event = event in [
+            "workout_started",
+            "set_completed",
+            "workout_completed",
+            "mid_set_check_in",
+        ]
 
-        now=time.time()
-
-        is_major_issue=event in ["workout_started","set_completed","workout_completed"]
-
-        if not is_major_issue:
-            if not issue:
+        if not is_priority_event:
+            cooldown = (
+                self.FORM_CORRECTION_COOLDOWN_SECONDS
+                if issue
+                else self.MID_SET_FEEDBACK_INTERVAL_SECONDS
+            )
+            if now - self.last_spoken_at < cooldown:
                 return None
 
-            if now-self.last_spoken_at<s:
-                return None
+        try:
+            text = self.llm.give_feedback(event, exercise, metrics, issue)
+        except Exception as error:
+            self.last_error = self._service_error("Groq", error)
+            return None
 
-        text=self.llm.give_feedback(event,issue)
-        voice=self.tts.speak(text)
+        try:
+            voice = self.tts.speak(text)
+        except Exception as error:
+            self.last_error = self._service_error("text-to-speech", error)
+            return None
 
-        self.last_spoken_at=now
+        if not voice:
+            self.last_error = "Voice coaching returned no audio. Please try again."
+            return None
 
-        return voice,text
+        self.last_spoken_at = now
+        self.last_error = None
 
-    def autoplay_audio(audio_bytes):
-        if not audio_bytes:
-            return
+        return voice, text
 
-        st.markdown(" <style>[data-testid='stAudio'] {display: none;}</style>",
-                     unsafe_allow_html=True)
-    
-        st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+    @staticmethod
+    def _service_error(service, error):
+        """Return a useful UI message without exposing credentials or tracebacks."""
+        status_code = getattr(error, "status_code", None)
 
-        
+        if status_code == 401:
+            return f"{service} rejected the configured API key."
+        if status_code == 404:
+            return f"The configured {service} model or service is unavailable."
+        if status_code == 429:
+            return f"{service} rate limit reached. Please wait a moment and try again."
+
+        return f"{service} could not generate audio. Check your internet connection and try again."
+
+
+# IMPORTANT:
+# This is outside the VoicePipeline class
+def autoplay_audio(audio_bytes):
+
+    if not audio_bytes:
+        return
+
+    st.markdown(
+        """
+        <style>
+        [data-testid='stAudio'] {
+            display: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.audio(
+        audio_bytes,
+        format="audio/mp3",
+        autoplay=True
+    )

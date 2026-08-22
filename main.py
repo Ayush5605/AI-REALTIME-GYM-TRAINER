@@ -3,6 +3,11 @@ import os
 import textwrap
 import time
 import pandas as pd
+from dotenv import load_dotenv
+from groq import Groq
+from services.coaching.llm import LLMCoach
+from services.coaching.tts import TextToSpeech
+from services.coaching.voice_pipeline import VoicePipeline,autoplay_audio
 
 from streamlit_webrtc import ( webrtc_streamer,WebRtcMode)
 
@@ -17,6 +22,12 @@ from services.persistence.exercise_repository import (
 )
 from services.vision.exercise_video_processor import VideoProcessorClass
 from services.tracking.metrics import sync_metrics_update
+
+
+# Streamlit does not load a project's .env file automatically.
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
+VOICE_PIPELINE_VERSION = 2
 
 
 def render_workout_history():
@@ -82,6 +93,33 @@ def main():
    
 
     initial_session_defaults()
+
+    if st.session_state.get("voice_pipeline_version") != VOICE_PIPELINE_VERSION:
+        api_key = os.environ.get("GROQ_API_KEY", "")
+
+        if not api_key and hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+            api_key = st.secrets["GROQ_API_KEY"]
+
+        if not api_key:
+            st.session_state.voice_pipeline = None
+            st.session_state.voice_error = (
+                "Voice coaching is unavailable because GROQ_API_KEY is not configured."
+            )
+        else:
+            try:
+                groq_client = Groq(api_key=api_key)
+                llm_coach = LLMCoach(groq_client)
+                tts = TextToSpeech()
+                st.session_state.voice_pipeline = VoicePipeline(llm_coach, tts)
+                st.session_state.voice_error = None
+            except Exception:
+                st.session_state.voice_pipeline = None
+                st.session_state.voice_error = "Voice coaching could not be initialized."
+
+        st.session_state.voice_pipeline_version = VOICE_PIPELINE_VERSION
+
+
+
 
 
     if not render_login_wall():
@@ -160,6 +198,17 @@ def main():
                 st.session_state.workout_complete = False
                 st.session_state.set_cycle_started_at=time.time()
                 st.session_state.last_saved_sets_completed= 0
+                st.session_state.last_mid_set_feedback_marker = None
+
+                if st.session_state.voice_pipeline:
+                    result = st.session_state.voice_pipeline.process_event(
+                        event="workout_started",
+                        exercise=plan_exercise,
+                        metrics={}
+                    )
+                    
+                    if result:
+                        st.session_state.audio_to_play, st.session_state.coach_feedback = result
                 st.session_state.last_notified_sets_completed = 0
                 st.session_state.last_notified_workout_complete=False
 
@@ -204,6 +253,14 @@ def main():
                 )
 
                 st.session_state.workout_started= False
+                if st.session_state.voice_pipeline:
+                    result = st.session_state.voice_pipeline.process_event(
+                        event="workout_completed",
+                        exercise=exercise,
+                        metrics={}
+                    )
+                    if result:
+                        st.session_state.audio_to_play, st.session_state.coach_feedback = result
 
                 st.rerun()
 
@@ -387,6 +444,21 @@ def main():
     st.markdown(
         "### Real-time pose detection with proactive AI voice coaching"
     )
+
+    if st.session_state.get("audio_to_play"):
+        autoplay_audio(st.session_state.audio_to_play)
+
+    if st.session_state.get("coach_feedback"):
+        st.markdown("")
+        st.success(f"🤖 **Coach:** {st.session_state.coach_feedback}")
+
+    voice_pipeline = st.session_state.get("voice_pipeline")
+    voice_error = st.session_state.get("voice_error")
+    if voice_pipeline and voice_pipeline.last_error:
+        voice_error = voice_pipeline.last_error
+
+    if voice_error:
+        st.warning(f"🔇 {voice_error}")
 
    
 
