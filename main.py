@@ -1,5 +1,12 @@
-import streamlit as st
+import sys
 import os
+
+# Ensure project root is in sys.path for Streamlit Cloud deployment
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import streamlit as st
 import textwrap
 import time
 import pandas as pd
