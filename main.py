@@ -509,6 +509,15 @@ def main():
                             "stun:stun4.google.com:19302",
                             "stun:global.stun.twilio.com:3478"
                         ]
+                    },
+                    {
+                        "urls": [
+                            os.getenv("TURN_SERVER", "turn:openrelay.metered.ca:80"),
+                            "turn:openrelay.metered.ca:443",
+                            "turns:openrelay.metered.ca:443?transport=tcp"
+                        ],
+                        "username": os.getenv("TURN_USERNAME", "openrelayproject"),
+                        "credential": os.getenv("TURN_CREDENTIAL", "openrelayproject")
                     }
                 ]
             },
