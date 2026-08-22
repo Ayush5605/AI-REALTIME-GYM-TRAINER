@@ -502,7 +502,12 @@ def main():
                 "iceServers": [
                     {
                         "urls": [
-                            "stun:stun1.google.com:19302"
+                            "stun:stun.l.google.com:19302",
+                            "stun:stun1.google.com:19302",
+                            "stun:stun2.google.com:19302",
+                            "stun:stun3.google.com:19302",
+                            "stun:stun4.google.com:19302",
+                            "stun:global.stun.twilio.com:3478"
                         ]
                     }
                 ]
