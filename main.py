@@ -20,7 +20,7 @@ from services.persistence.exercise_repository import (
     get_users_exercises,
     init_db,
 )
-from services.vision.exercise_video_processor import VideoProcessorClass
+from services.vision.exercise_video_processor import  VideoProcessorClass
 from services.tracking.metrics import sync_metrics_update
 
 
