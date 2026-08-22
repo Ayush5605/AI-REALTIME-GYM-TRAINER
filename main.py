@@ -498,6 +498,28 @@ def main():
 
     else:
 
+        # Check Streamlit secrets or env vars for custom TURN configuration
+        turn_server = os.getenv("TURN_SERVER") or (st.secrets.get("TURN_SERVER", "") if hasattr(st, "secrets") else "")
+        turn_username = os.getenv("TURN_USERNAME") or (st.secrets.get("TURN_USERNAME", "") if hasattr(st, "secrets") else "")
+        turn_credential = os.getenv("TURN_CREDENTIAL") or (st.secrets.get("TURN_CREDENTIAL", "") if hasattr(st, "secrets") else "")
+
+        if turn_server and turn_username and turn_credential:
+            turn_config = {
+                "urls": [turn_server],
+                "username": turn_username,
+                "credential": turn_credential,
+            }
+        else:
+            turn_config = {
+                "urls": [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turn:openrelay.metered.ca:443?transport=tcp",
+                ],
+                "username": "openrelayproject",
+                "credential": "openrelayproject",
+            }
+
         ice_servers = [
             {
                 "urls": [
@@ -505,20 +527,9 @@ def main():
                     "stun:stun1.google.com:19302",
                     "stun:stun2.google.com:19302",
                 ]
-            }
+            },
+            turn_config
         ]
-
-        # Check Streamlit secrets or env vars for TURN configuration
-        turn_server = os.getenv("TURN_SERVER") or (st.secrets.get("TURN_SERVER", "") if hasattr(st, "secrets") else "")
-        turn_username = os.getenv("TURN_USERNAME") or (st.secrets.get("TURN_USERNAME", "") if hasattr(st, "secrets") else "")
-        turn_credential = os.getenv("TURN_CREDENTIAL") or (st.secrets.get("TURN_CREDENTIAL", "") if hasattr(st, "secrets") else "")
-
-        if turn_server and turn_username and turn_credential:
-            ice_servers.append({
-                "urls": [turn_server],
-                "username": turn_username,
-                "credential": turn_credential,
-            })
 
         context = webrtc_streamer(
             key="exercise-analysis",
@@ -532,7 +543,10 @@ def main():
             },
 
             media_stream_constraints={
-                "video": True,
+                "video": {
+                    "width": {"ideal": 640},
+                    "height": {"ideal": 480},
+                },
                 "audio": False
             },
 
