@@ -491,6 +491,28 @@ def main():
 
     else:
 
+        ice_servers = [
+            {
+                "urls": [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.google.com:19302",
+                    "stun:stun2.google.com:19302",
+                ]
+            }
+        ]
+
+        # Check Streamlit secrets or env vars for TURN configuration
+        turn_server = os.getenv("TURN_SERVER") or (st.secrets.get("TURN_SERVER", "") if hasattr(st, "secrets") else "")
+        turn_username = os.getenv("TURN_USERNAME") or (st.secrets.get("TURN_USERNAME", "") if hasattr(st, "secrets") else "")
+        turn_credential = os.getenv("TURN_CREDENTIAL") or (st.secrets.get("TURN_CREDENTIAL", "") if hasattr(st, "secrets") else "")
+
+        if turn_server and turn_username and turn_credential:
+            ice_servers.append({
+                "urls": [turn_server],
+                "username": turn_username,
+                "credential": turn_credential,
+            })
+
         context = webrtc_streamer(
             key="exercise-analysis",
 
@@ -499,27 +521,7 @@ def main():
             video_processor_factory=VideoProcessorClass,
 
             rtc_configuration={
-                "iceServers": [
-                    {
-                        "urls": [
-                            "stun:stun.l.google.com:19302",
-                            "stun:stun1.google.com:19302",
-                            "stun:stun2.google.com:19302",
-                            "stun:stun3.google.com:19302",
-                            "stun:stun4.google.com:19302",
-                            "stun:global.stun.twilio.com:3478"
-                        ]
-                    },
-                    {
-                        "urls": [
-                            os.getenv("TURN_SERVER", "turn:openrelay.metered.ca:80"),
-                            "turn:openrelay.metered.ca:443",
-                            "turns:openrelay.metered.ca:443?transport=tcp"
-                        ],
-                        "username": os.getenv("TURN_USERNAME", "openrelayproject"),
-                        "credential": os.getenv("TURN_CREDENTIAL", "openrelayproject")
-                    }
-                ]
+                "iceServers": ice_servers
             },
 
             media_stream_constraints={
